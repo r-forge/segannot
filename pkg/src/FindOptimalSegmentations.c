@@ -1,0 +1,143 @@
+#include <R.h>
+#include <Rinternals.h>
+
+//////////////////////////////////
+//                              //
+//  FindOptimalSegmentations.c  //
+//                              //
+//////////////////////////////////
+
+#include "FindOptimalSegmentations.h"
+
+#include <stdlib.h>
+#include <math.h>
+// Assume that the last annotated region is [n-1, n-1] //
+// Assume pMax >= 2
+void FindOptimalSegmentations(const double * x, const unsigned *sR, const unsigned *eR, const unsigned nMax,  
+			const unsigned pMax, unsigned * iDPath, double * cost)
+{
+	//printf("Cumulative sum \n");
+    // Cumulative sum of x //
+	double * sx = (double *)malloc(nMax * sizeof(double));
+	sx[0] = x[0];
+	for (unsigned n = 1; n < nMax; ++n)
+	{
+		sx[n] = sx[n-1] + x[n]; 
+	}
+	
+	//printf("Cost allocation\n");
+	// Keeping Cost and Indexes //
+	// Initialize Cost object for the different regions //
+	double ** C = (double **) malloc(pMax * sizeof(double*));
+	for (unsigned p = 0; p < pMax; ++p)
+	{
+		//printf("Lg Region %d, %d, %d: %d", p, sR[p], eR[p], (eR[p] - sR[p]+1));
+		C[p] = (double *) malloc( (eR[p] - sR[p]+1) * sizeof(double));
+		for(unsigned i=0; i < (eR[p] - sR[p]+1); ++i)
+		{
+			C[p][i] = INFINITY;
+		}
+	}
+	// Initialize Last change object for the different regions //
+
+	//printf("Indexes allocation\n");
+	unsigned ** M = (unsigned **) malloc(pMax * sizeof(unsigned*));
+	for (unsigned p = 0; p < pMax; ++p)
+	{
+		M[p] = (unsigned *) malloc( (eR[p] - sR[p]+1) * sizeof(unsigned));
+		for(unsigned i=0; i < (eR[p] - sR[p]+1); ++i)
+		{
+			M[p][i] = 0;
+		}
+	}
+	
+	
+	// Initialization //
+	// the first break is in the first region //
+	//printf("Initialisation C[0][t]\n");
+	unsigned tOut=sR[0];
+	unsigned idOut=0;
+	double scx;
+	unsigned lx;
+	while (tOut <= eR[0]) 
+	{
+		scx = sx[tOut];
+		lx = tOut+1;
+		C[0][idOut] = -scx*scx / lx;
+		//printf("C[0][%d] = %f^2 / %d = %f\n", tOut, scx, lx, C[0][idOut]);
+		M[0][idOut] = 0;
+		tOut++;
+		idOut++;
+	}
+	
+	// Update //
+	//printf("Update C[p>=1][t]\n");
+	unsigned idIn;
+	unsigned tIn;
+	double proposedCost;
+	for (unsigned p = 1; p < pMax; ++p)
+	{
+		idIn=0;
+		tIn=sR[p-1];
+		
+		while( tIn <= eR[p-1])
+		{	
+			// TODO:make sure we are not going backward 
+			tOut=sR[p];
+			if(tOut < tIn) {
+  			//printf("p: %d, tIn :%d, tOut :%d \n", p, tIn, tOut );
+			tOut = tIn +1; // ADDED
+			}
+			//idOut=0; // OLD
+			idOut = tOut - sR[p]; // NEW
+			while( tOut <= eR[p])
+			{
+				scx= sx[tOut] - sx[tIn];
+				lx= tOut- tIn;
+				proposedCost = C[p-1][idIn] - ((scx*scx) / lx);
+				if(proposedCost < C[p][idOut])
+				{
+					C[p][idOut] = proposedCost;
+					M[p][idOut] = idIn;
+					//printf("From %d: %d, C[%d][%d] = %f - %f^2 / %d = %f\n", tIn, M[p][idOut], p, tOut, C[p-1][idIn],  scx, lx, C[p][idOut]);
+
+				}
+				tOut++;
+				idOut++;
+			}
+			
+			tIn++;
+			idIn++;
+		}
+	}
+	
+	
+	
+	// Finish //
+	//printf("Finish %d, %d \n", pMax-1, M[pMax-1][0]);
+	iDPath[pMax-1] = M[pMax-1][0];
+	cost[0] = C[pMax-1][0];
+	//printf("Retour %d, %f\n", M[pMax-1][0], C[pMax-1][0]);
+	for (unsigned p = pMax-2; p > 0; --p) 
+	{
+		//printf("Retour %d, %d, %d\n", p, iDPath[p+1], M[p][iDPath[p+1]]);
+		iDPath[p] = M[p][iDPath[p+1]];
+	}
+	
+
+	// Free allocated object //
+	//printf("Free \n");
+	free(sx);
+	
+	for (unsigned p = 0; p < pMax; ++p)
+	{
+		free(C[p]);
+	}
+	free(C);
+	
+	for (unsigned p = 0; p < pMax; ++p)
+	{
+		free(M[p]);
+	}
+	free(M);
+}

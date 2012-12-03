@@ -1,0 +1,8 @@
+
+# Declare that we use a dynamically loaded C library.
+# Make sure that the 'bridge_FindOptimalSegmentations' C function can be found.
+
+useDynLib(SegAnnot)
+
+
+exportPattern("^[[:alpha:]]+")

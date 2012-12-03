@@ -1,0 +1,13 @@
+Package: SegAnnot
+Version: 1.0
+Date: 2012-11-30
+Title: Annotation-aware segmentation via dynamic programing
+License: Unlimited
+Description: The SegAnnot package provides a function
+    'SegAnnot()' that calculates the L2 optimal segmentation
+    for a given set of 1-annotated regions.
+Author: Guillem Rigaill, Toby Dylan Hocking
+Maintainer: Guillem Rigaill <g.rigaill@nki.nl>
+Depends: R (>= 2.10)
+Suggests: proto, ggplot2
+
