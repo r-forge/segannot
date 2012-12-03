@@ -9,5 +9,5 @@ Description: The SegAnnot package provides a function
 Author: Guillem Rigaill, Toby Dylan Hocking
 Maintainer: Guillem Rigaill <g.rigaill@nki.nl>
 Depends: R (>= 2.10)
-Suggests: proto, ggplot2
+Suggests: proto, ggplot2, cghseg, tikzDevice
 
