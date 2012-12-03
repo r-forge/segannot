@@ -3,13 +3,8 @@
 \title{geom tallrect}
 \description{ggplot2 geom with xmin and xmax aesthetics that covers the entire
 y range.}
-\usage{
-geom_tallrect(mapping = NULL,
-data = NULL,
-stat = "identity",
-position = "identity",
-...)
-}
+\usage{geom_tallrect(mapping = NULL, data = NULL, stat = "identity", 
+    position = "identity", ...)}
 \arguments{
   \item{mapping}{
 }

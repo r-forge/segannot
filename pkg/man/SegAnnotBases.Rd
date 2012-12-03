@@ -6,12 +6,7 @@ complete 0/1 annotation of the signal, so you just need to specify
 where the 1-annotated regions occur, in terms of base pairs. We
 first convert starts and ends from base pairs to indices, then we
 use the SegAnnot function.}
-\usage{
-SegAnnotBases(y,
-base,
-starts,
-ends)
-}
+\usage{SegAnnotBases(y, base, starts, ends)}
 \arguments{
   \item{y}{The vector of observations to segment.}
   \item{base}{Position of each observation in base pairs.}

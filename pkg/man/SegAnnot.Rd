@@ -8,11 +8,7 @@ solver gives you the solution y of min_y ||y-x||^2 such that there
 is exactly 1 break in each of the annotated regions, and no breaks
 elsewhere. See also the SegAnnotBases function, for which the
 annotations are specified in terms of base pairs.}
-\usage{
-SegAnnot(x,
-sR,
-eR)
-}
+\usage{SegAnnot(x, sR, eR)}
 \arguments{
   \item{x}{Numeric vector: the signal to segment.}
   \item{sR}{Starts of the 1-annotated regions.}

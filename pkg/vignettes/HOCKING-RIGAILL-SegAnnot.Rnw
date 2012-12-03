@@ -1,0 +1,898 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage{fullpage}
+\usepackage{tikz}
+\usepackage{stmaryrd}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{ulem}
+\newtheorem{proposition}{Proposition}
+
+\newtheorem{definition}{Definition}
+\newcommand{\pkg}[1]{\textbf{#1}}
+\newcommand{\code}[1]{#1}
+\newcommand{\replace}[2]{\textcolor{blue}{\sout{#1}}\textcolor{red}{#2}}
+
+\newcommand{\RR}{\mathbb R}
+
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+%\VignetteIndexEntry{SegAnnot}
+\title{SegAnnot: an R package
+  for fast segmentation of annotated piecewise constant signals}
+\author{Toby Dylan Hocking \\ Guillem Rigaill}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We describe and propose an implementation of a dynamic programming algorithm for the segmentation of annotated piecewise constant signals.
+The algorithm is exact in the sense that it recovers the best possible segmentation w.r.t. the quadratic loss that agrees with the annotations.
+\end{abstract}
+\tableofcontents
+
+\newpage
+
+\section{Introduction: annotations motivate dedicated 
+  segmentation algorithms}
+
+In bioinformatics, there are many noisy assays that attempt to measure
+chromosomal copy number of a sample of cells. For example, one can
+recover a piecewise constant signal of copy number from array CGH or
+SNP microarrays.
+
+Many algorithms have been proposed to analyze these data, and in
+practice an expert biologist will examine scatterplots to judge if the
+model segmentation is a good fit to the data. \citet{bams} make this
+visual criterion for model selection concrete by defining annotated
+regions that can quantify the accuracy of a segmentation. That study
+showed that the maximum likelihood segmentation given by the pruned
+dynamic programming (DP) algorithm of \citet{pruned-dp} or PELT
+\citep{killick_optimal_2011} resulted in the best breakpoint learning
+(see extended results of \citet{bams}). However, there are two
+drawbacks to that approach:
+\begin{itemize}
+\item \textbf{(Speed)} The pruned DP or PELT algorithms were not the
+  fastest examined in that comparison.
+\item \textbf{(Fitting)} We may have more than one breakpoint
+  annotation per chromosome. In that case, there may be no maximum
+  likelihood segmentation that agrees with all the annotations.
+\end{itemize}
+
+Furthermore, no optimization algorithms have been specifically
+designed to exploit the breakpoint annotations. The goal of this work
+is to characterize a new optimization problem and segmentation
+algorithm, \pkg{SegAnnot}. It exploits the structure of the annotated
+region data to increase both \textbf{Speed} and \textbf{Fitting}.
+
+
+\section{Motivating examples}\label{motivating_examples}
+
+We begin by showing two annotated copy number profiles from low and
+high density microarrays of neuroblastoma tumors. In both cases, there
+is no maximum likelihood segmentation that agrees with the breakpoint
+annotations.
+
+\newpage
+
+Let us first give a few notations. We analyze a chromosome with $D$
+base pairs $\mathcal X=\{1,\dots,D\}$, so the set of all possible
+breakpoints is $\mathbb B=\{1,\dots,D-1\}$. The microarray gives us a
+vector of logratio observations $y\in\RR^d$ at positions $p\in\mathcal
+X^d$, sorted in increasing order $p_1<\cdots<p_d$. We define the
+estimated signal with $k$ segments as
+\begin{equation}
+\label{eq:yhat^k}
+\begin{aligned}
+\hat y^k = &\argmin_{x\in\RR^d} &&  ||y - x||^2_2
+\\
+&\text{subject to} && k-1=\sum_{j=1}^{d-1} 1_{x_j\neq x_{j+1}}.
+\end{aligned}
+\end{equation}
+Note that we can quickly calculate $\hat y^k$ for
+$k\in\{1,\dots,k_{\text{max}}\}$ using pruned DP \citep{pruned-dp}. In
+the figure below, we plot the noisy observations $y$ for one
+chromosome on a low-density array as $d=123$ black points.
+
+\SweaveOpts{fig=TRUE,width=7,height=3,results=hide,echo=FALSE}
+
+<<frontpage>>=
+library(SegAnnot)
+library(ggplot2)
+data(profiles)
+lo <- profiles$low
+chr <- lo$pro
+result <- with(chr,run.cghseg(logratio,position,5))
+regions <- lo$ann
+labeller <- function(var,val){
+  s <- ifelse(val==1,"","s")
+  sprintf("%s segment%s",val,s)
+}
+lwd <- 1
+p <- ggplot()+
+  geom_tallrect(aes(xmin=min/1e6,xmax=max/1e6,fill=annotation),
+                data=regions,colour="black")+
+  geom_vline(aes(xintercept=base/1e6),
+             linetype="dashed",colour=signal.colors["estimate"],
+             data=result$break.df,lwd=lwd)+
+  geom_point(aes(position/1e6,logratio),data=chr)+
+  geom_segment(aes(first.base/1e6,mean,xend=last.base/1e6,yend=mean),
+               data=result$segments,lwd=lwd,
+               colour=signal.colors["estimate"])+
+  scale_fill_manual(values=breakpoint.colors)+
+  facet_grid(segments~.,labeller=labeller)+
+  xlab("position on chromosome 17 (mega base pairs)")
+print(p)
+@ 
+
+In the figure above, the estimated signals $\hat y^k$ are drawn as
+green lines for $k=1$ to $5$ segments. The cghseg model tells us the
+points after which a break occurs, not the precise bases. So we define
+the estimated breakpoint locations shown as vertical green dashed
+lines using the mean
+\begin{equation}
+  \label{eq:breaks}
+\phi(\hat y^k,p)
+= \big\{
+\lfloor 
+(p_j+p_{j+1})/2
+\rfloor
+\text{ for all }j\in\{1,\dots,d-1\}\text{ such that }
+\hat y^k_j\neq \hat y^k_{j+1}
+\big\}.
+\end{equation}
+
+Note that this is a function $\phi:\RR^d\times \mathcal X^d\rightarrow
+2^{\mathbb B}$ that gives the positions after which there is a break
+in the estimated signal $\hat y^k$. Clearly, none of the models $\hat
+y^1,\dots,\hat y^5$ agree with all 3 of the breakpoint annotations.
+
+\newpage
+
+The second example we show is a high-density array with 153,663 probes
+on chromosome 2. We zoom into 4 windows of interest in the plot below,
+showing only 3,068 of the probes.
+
+<<problematic>>=
+pro <- profiles$hi
+chr <- pro$pro
+results <- with(chr,run.cghseg(logratio,position,13))
+anns <- pro$ann
+win <- function(min,max)data.frame(min=min*1e5,max=max*1e5)
+windows <- rbind(win(  65,  71),
+                 win( 148, 171),
+                 win( 355, 361),
+                 win(1060,1065))
+anns$mid <- with(anns,(min+max)/2)
+chr.df <- data.frame()
+ann.df <- data.frame()
+seg.df <- data.frame()
+breaks <- data.frame()
+showSegs <- c(1,2,3,5,7,13)
+for(i in 1:nrow(windows)){
+  w <- windows[i,]
+  sm.df <- subset(results$seg,!(first.base>w$max | last.base<w$min))
+  sm.df$first.base[sm.df$first.base < w$min] <- w$min
+  sm.df$last.base[sm.df$last.base > w$max] <- w$max
+  breaks <- rbind(breaks,{
+    data.frame(subset(results$break.df,w$min < base & base < w$max &
+                      segments%in%showSegs),i)
+  })
+  seg.df <- rbind(seg.df,{
+    data.frame(subset(sm.df,segments%in%showSegs),i)
+  })
+  chr.df <- rbind(chr.df,{
+    data.frame(subset(chr,w$min < position & position < w$max),i)
+  })
+  ann.df <- rbind(ann.df,{
+    data.frame(subset(anns,w$min < mid & mid < w$max),i)
+  })
+}
+labeller <- function(var,val){
+  if(var=="segments"){
+    s <- ifelse(val==1,"","s")
+    sprintf("%s segment%s",val,s)
+  }else{
+    sprintf("window %d",val)
+  }
+}
+br <- c(6.5,7.0,seq(15,17,by=0.5),35.5,36,106,106.5)
+names(br) <- as.character(br)
+p <- ggplot()+
+  geom_tallrect(aes(xmin=min/1e6,xmax=max/1e6,fill=annotation),
+                colour="black",data=ann.df)+
+  geom_point(aes(position/1e6,logratio),data=chr.df)+
+  geom_segment(aes(first.base/1e6,mean,xend=last.base/1e6,yend=mean),
+               data=seg.df,colour=signal.colors[["estimate"]],lwd=1)+
+  geom_vline(aes(xintercept=base/1e6),data=breaks,
+             colour=signal.colors[["estimate"]],linetype="dashed",lwd=1)+
+  scale_fill_manual(values=breakpoint.colors)+
+  facet_grid(segments~i,scales="free",space="free",labeller=labeller)+
+  scale_x_continuous("position on chromosome 2 (mega base pairs)",
+                     breaks=br)
+print(p)
+@ 
+
+Models with $k\in\{4,6,8,\dots,12\}$ segments are not shown since each
+is identical to one of the shown models on these four
+windows. Clearly, no model agrees with all of the breakpoint annotations.
+Indeed, it is only for $k=13$ segments that all breakpoint regions
+(red) are correctly identified, but a breakpoint is identified in a
+flat region (yellow) as soon as $k\geq5$.  To show detail of windows
+3 and 4, we zoom in the plot below to clearly show their small
+$\approx 10$kb losses.
+
+<<zoom>>=
+win <- function(min,max)data.frame(min=min*1e5,max=max*1e5)
+windows <- rbind(win(100,101),##keep these
+                 win(200,201),## two dummy windows
+                 win( 358, 358.75),
+                 win(1062.25,1062.75))
+anns$mid <- with(anns,(min+max)/2)
+chr.df <- data.frame()
+ann.df <- data.frame()
+showSegs <- c(13)
+seg.df <- data.frame()
+breaks <- data.frame()
+for(i in 3:4){
+  w <- windows[i,]
+  sm.df <- subset(results$seg,!(first.base>w$max | last.base<w$min))
+  sm.df$first.base[sm.df$first.base < w$min] <- w$min
+  sm.df$last.base[sm.df$last.base > w$max] <- w$max
+  breaks <- rbind(breaks,{
+    data.frame(subset(results$break.df,w$min < base & base < w$max &
+                      segments%in%showSegs),i)
+  })
+  seg.df <- rbind(seg.df,{
+    data.frame(subset(sm.df,segments%in%showSegs),i)
+  })
+  ann.df <- rbind(ann.df,{
+    d <- subset(anns,
+                (w$min < min & min < w$max)|
+                (w$min < max & max < w$max))
+    transform(d,i=i,
+              min=ifelse(w$min>min,w$min,min),
+              max=ifelse(w$max<max,w$max,max))
+  })
+  chr.df <- rbind(chr.df,{
+    data.frame(subset(chr,w$min < position & position < w$max),i)
+  })
+}
+labeller <- function(var,val){
+  if(var=="segments"){
+    s <- ifelse(val==1,"","s")
+    sprintf("%s segment%s",val,s)
+  }else{
+    sprintf("window %d",val)
+  }
+}
+p <- ggplot()+
+  geom_tallrect(aes(xmin=min/1e3,xmax=max/1e3,fill=annotation),
+                colour="black",data=ann.df)+
+  geom_point(aes(position/1e3,logratio),data=chr.df)+
+  geom_segment(aes(first.base/1e3,mean,xend=last.base/1e3,yend=mean),
+               data=seg.df,colour=signal.colors[["estimate"]],lwd=1)+
+  geom_vline(aes(xintercept=base/1e3),data=breaks,
+             colour=signal.colors[["estimate"]],linetype="dashed",lwd=1)+
+  scale_fill_manual(values=breakpoint.colors)+
+  facet_grid(segments~i,scales="free",space="free",labeller=labeller)+
+  scale_x_continuous("position on chromosome 2 (kilo base pairs)",
+                     breaks=c(seq(35800,35900,by=20),seq(106230,106270,by=20)))
+print(p)
+@ 
+
+The fact that the maximum-likelihood segmentation sometimes cannot
+match the expert's annotations is unsatisfying. In those cases, one
+would like to perform constrained segmentation, and recover the best
+segmentation that satisfies the expert's annotations. We explore this
+idea in the rest of this paper and propose an exact algorithm to solve
+it.
+
+\section{Segmentation via annotation-aware optimization}
+
+First, we will give a precise definition of a segmentation and the
+breakpoint annotations. Then, we will define what it means for a
+segmentation to be consistent with the annotations. Finally, we will
+use this definition to formulate an optimization problem.
+
+\subsection{Definition of a segmentation}
+
+We represent our signal to segment as a vector $y\in\RR^d$, and we
+want to find a \textbf{segmentation} $m\in\mathcal M_{K,d}$, the set
+of all possible segmentations with $K$ segments. We define a
+\textbf{segment} $r_k(m) = \llbracket\tau_k,\tau_{k+1}\llbracket$ in
+terms of its limiting indices $\tau_k,\tau_{k+1}\in\llbracket
+1,d\rrbracket$. For $K>1$, we define $\tau_2,\dots,\tau_{K}$ to be the
+\textbf{breakpoints}. We can write any segmentation $m\in\mathcal
+M_{K,d}$ as a set of $K$ segments, in this form:
+\begin{equation}
+  \label{eq:segmentation}
+  \begin{array}{ccccccccccccc}
+  m & = &
+  \{ & r_1(m) & , & r_2(m) & , &\dots &, &r_{K-1}(m) & ,& r_K(m) &\}\\
+&  = &
+\{&
+  \llbracket\tau_1=1,\tau_2\llbracket&,&
+  \llbracket\tau_2,\tau_3\llbracket&,&
+  \dots&,&
+  \llbracket\tau_{K-1},\tau_K\llbracket&,&
+  \llbracket\tau_K,\tau_{K+1}=d+1\llbracket&
+  \}
+\end{array}
+\end{equation}
+
+How to choose among the $|\mathcal M_{K,d}|={d-1 \choose K-1}$
+possible segmentations? We would like
+\begin{enumerate}
+\item the reconstruction error to be as low as possible, and
+\item the breakpoint annotations to be respected.
+\end{enumerate}
+
+\subsection{Definition of the breakpoint annotations}
+
+The breakpoint annotations represent prior knowledge about where
+breaks should occur in any valid model. For example, they can
+represent an expert's desired segmentation on inspection of a
+scatterplot of observations $y$ against position $p$.
+
+Assume the expert annotates $J$ regions $A_1,\dots,A_J$ and that each
+region is defined as $A_j=\llbracket
+\underline\alpha_j,\overline\alpha_j\llbracket$
+%, with
+%$\underline\alpha_j\in\llbracket 1,d-1\rrbracket$ and
+%$\overline\alpha_{j}\in\llbracket
+%\underline\alpha_j+1,d\rrbracket$. 
+Note that the smallest regions on
+the left and right designate the gaps between the last 2 points,
+i.e. $\llbracket 1,2\llbracket$ and $\llbracket d-1,d\llbracket$. And
+the largest possible annotated region is $\llbracket
+1,d\llbracket$. Furthermore, the maximal number of breakpoints per
+region is $\overline\alpha_{j}-\underline\alpha_j$.
+
+For each region $A_j$ the annotator associates a set of acceptable
+breakpoint counts $a_j$, typically defined as one of the following:
+
+\begin{tabular}{rcl}
+  in words & abbreviation & breakpoint counts $a_j$ \\
+  \hline
+  no breakpoints, flat  & 0 &  \{0\}\\
+  exactly 1 breakpoint & 1 &  \{1\} \\
+ exactly $b$ breakpoints & $b$ & \{$b$\} \\
+  1 or more breakpoints & 1+ &$\{1,\dots,\underline\alpha_{j}-\overline\alpha_j\}$ \\
+  no information & 0+ & $\{0,1,\dots,\underline\alpha_{j}-\overline\alpha_j\}$
+\end{tabular}
+
+\subsection{Definition of a consistent segmentation}
+
+For any segmentation $m$ we can write
+$1=\tau_1<\tau_2<\dots<\tau_K<\tau_{K+1}=d+1$. For~$2\leq i\leq K$ the
+following function indicates when breakpoint~$\tau_i$ is inside
+annotation~$A_j$:
+\begin{equation}
+  \label{eq:b}
+  b(\tau_i,A_j) =
+  \begin{cases}
+    1 & \underline \alpha_j < \tau_i \leq \overline\alpha_j\\
+    0 & \text{otherwise}
+  \end{cases}
+\end{equation}
+and we can count the number of breakpoints inside annotation~$A_j$
+using
+\begin{equation}
+  \label{eq:B}
+  B(m,A_j) = \sum_{i=2}^K b(\tau_i,A_j)
+\end{equation}
+
+\begin{definition}
+  We say that segmentation~$m$ is \textbf{consistent} with the
+  annotations~$A$ if for all annotated regions~$j$, we have
+  $B(m,A_j)\in a_j$.
+\end{definition}
+
+\subsection{The annotation-aware segmentation problem}
+
+Let us define the set $\mathcal M_{K,d,A}\subseteq \mathcal M_{K,d}$
+as the set of all segmentations of $d$ points with $K$ segments which
+are \textbf{consistent} with the annotations $A$. One way to formalize
+the annotation-constrained optimization problem is to just replace the
+set $\mathcal M_{K,d}$ with $\mathcal M_{K,d,A}$:
+\begin{equation}
+  \label{eq:min_ann_square_loss}
+  \min_{m\in\mathcal M_{K,d,A}}\sum_{r\in m}
+  \min_{\mu\in\RR}\sum_{i\in r} (Y_i-\mu)^2
+\end{equation}
+
+\begin{proposition}
+  The minimum number of segments $k$ such that $|\mathcal
+  M_{k,d,A}|>0$ is $$k_{\min}=1+\sum_{j=1}^J\min a_j,$$ so the
+  optimization problem in \autoref{eq:min_ann_square_loss} is
+  well-defined only when $K\geq k_{\min}$.
+\end{proposition}
+
+\newpage
+
+\section{Only 0 and 1 annotations}
+
+In this section, we will explore the annotation-aware segmentation
+problem for the special case where there are only 0 and 1 annotations
+over the entire signal. For example, consider the signal
+$y\in\RR^{10}$ and breakpoint annotations in the figure below.
+
+<<notation-possible-models,fig=FALSE>>=
+set.seed(3)
+y <- c(rnorm(3),rnorm(4,3),rnorm(3))
+plot(y)
+regions <-
+  data.frame(annotation=c("0breakpoints","1breakpoint","0breakpoints","1breakpoint"),
+             min=c(1,2,4,7),
+             max=c(2,4,7,10))
+regions <- transform(regions,mid=(min+max)/2,y=0,
+  set=sprintf("$a_%d = \\{ %s \\}$",seq_along(min),substr(annotation,1,1)),
+  label=sprintf("$A_%d = \\llbracket %d, %d \\llbracket$",
+    seq_along(min),min,max))
+regions$y[1] <- 2
+signal <- data.frame(i=seq_along(y),y)
+labeled.points <- transform(signal[c(4,7),],
+                     label=sprintf("$y_%d = %.02f$",i,y))
+yl <- "signal $y_i$"
+labeller <- function(var,val){
+  sprintf("model %d",val)
+}
+p <- ggplot()+
+  geom_tallrect(aes(xmin=min,xmax=max,fill=annotation),data=regions,alpha=1/2)+
+  geom_point(aes(i,y),data=signal)+
+  geom_text(aes(mid,y,label=label),data=regions)+
+  geom_text(aes(mid,y-0.5,label=set),data=regions)+
+  geom_text(aes(i,y,label=label),data=labeled.points,hjust=-0.1,vjust=1.1)+
+  scale_fill_manual(values=c("0breakpoints"="#f6f4bf","1breakpoint"="#ff7d7d"))+
+  scale_x_continuous("",breaks=1:10)+
+  ylab(yl)
+print(p)
+library(tikzDevice)
+dec <- "\\documentclass[12pt]{article}\n\\usepackage{stmaryrd}"
+options(tikzDocumentDeclaration=dec,tikzMetricsDictionary="tikzMetrics")
+tikz("figure-notation.tex",height=3)
+print(p)
+dev.off()
+
+## put together list of all possible segmentations
+breakpoints <- subset(regions,annotation=="1breakpoint")
+breakpoints.x <- lapply(seq_along(breakpoints$min),function(i){
+  with(breakpoints[i,],(min:(max-1))+0.5)
+})
+breakpoint.list <- do.call(expand.grid,breakpoints.x)
+segment.ends <- data.frame(start=1,breakpoint.list,end=length(y),
+                           model=1:nrow(breakpoint.list))
+all.segments <- do.call(rbind,lapply(seq_along(segment.ends$model),function(i){
+  do.call(rbind,lapply(1:(nrow(breakpoints)+1),function(tau.index){
+    min <- segment.ends[i,tau.index]
+    max <- segment.ends[i,tau.index+1]
+    yseg <- y[min <= signal$i & signal$i <= max]
+    mu <- mean(yseg)
+    rss <- sum( (yseg-mu)^2 )
+    data.frame(min,max,model=segment.ends[i,"model"],mu,rss,tau.index)
+  }))
+}))
+tau <- transform(subset(all.segments,tau.index!=3),
+  tau.index=tau.index+1,
+  tau.value=floor(max+1))
+tau$label <- with(tau,sprintf("$\\tau_%d = %d$",tau.index,tau.value))
+p <- ggplot()+
+  geom_tallrect(aes(xmin=min,xmax=max,fill=annotation),data=breakpoints,alpha=1/2)+
+  geom_point(aes(i,y),data=signal)+
+  geom_vline(aes(xintercept=tau.value),data=tau,linetype="dashed")+
+  geom_text(aes(tau.value+0.1,mu,label=label),data=tau,hjust=0)+
+  geom_segment(aes(min,mu,xend=max,yend=mu),data=all.segments,lwd=1.5)+
+  facet_grid(model~.,labeller=labeller)+
+  scale_fill_manual(values=c("0breakpoints"="#f6f4bf","1breakpoint"="#ff7d7d"),guide="none")+
+  scale_x_continuous("index $i$",breaks=1:11,limits=c(1,11))+
+  ylab(yl)+
+  ggtitle("The set of all 6 models (black lines) in $\\mathcal M_{K=3,d=10,A}$")
+print(p)
+tikz("figure-possible-models.tex",width=6,height=5)
+print(p)
+dev.off()
+@ 
+
+\input{figure-notation}
+
+\vskip -0.5in
+For the data and annotations above, the only consistent models are
+shown below.
+
+
+\input{figure-possible-models}
+
+The optimization problem is: which of these 6 segmentations is the most
+likely?
+
+\subsection{Number of changes and number of possible segmentations}
+In the 0/1 case there is only one possible number of segments $K$ and
+the number of possible segmentations is $|\mathcal M_{K,d,A}| =
+\prod_{k=1}^K (\overline\alpha^1_{k} - \underline\alpha^1_{k})$, where
+$\overline\alpha^1_{k}$ and $\underline\alpha^1_{k}$ are the borders
+of the $k$-th 1-annotated region.  If we define $l =
+\sum_{k=1}^K (\overline\alpha^1_{k} - \underline\alpha^1_{k}) \leq d$
+we get an upper bound on $|\mathcal M_{K,d,A}|$ by taking all
+$\overline\alpha^1_{k} - \underline\alpha^1_{k}$ equal to $l/K$:
+
+$$ |\mathcal M_{K,d,A}| 
+=\prod_{k=1}^K (\overline\alpha^1_{k} - \underline\alpha^1_{k}) \leq
+(\frac{l}{K})^K \leq (\frac{d}{K})^K \leq |\mathcal M_{K,d}| = {d-1
+  \choose K}.$$
+
+When $d$ goes to infinity and $K$ remains fixed we have ${d-1 \choose
+  K} \sim \frac{(d-K)^{k+1}}{d k!} $ (Stirling).  Thus if the length
+of the 1-annotated regions are fixed when $d$ goes to infinity, we
+obviously get that $\lim_{d \to +\infty} \frac{|\mathcal M_{K,d, A}|
+}{|\mathcal M_{K,d}|} = 0$.  On the other hand, if the size of all
+these 1-annotated regions is $d/K$ we get that $\lim_{d \to
+  +\infty}\frac{|\mathcal M_{K,d, A}| }{|\mathcal M_{K,d}|} = K! / K^K
+> 0$.
+
+
+\subsection{Algorithm}
+Suppose that we have a complete 0/1 annotation. We want to recover the
+consistent segmentation which is best in terms of the square loss.
+
+We define $C_{k,t, A}$ as the best cost in $k$ segments up to and
+including $t$ under our set of annotations $A$.  By definition a
+segmentation that is not consistent with the annotations $A$ has an
+infinite cost.
+
+Equation~\ref{eq:b} tells us that the $k$-th breakpoint $\tau_{k+1}$ must verify 
+$\underline\alpha^1_{k}< \tau_{k+1}\leq\overline\alpha^1_{k}$ in the 0/1 case.
+In other words, $C_{k,t,A}$ is finite only for 
+$ \underline\alpha^1_{k}< t \leq\overline\alpha^1_{k}$ or 
+$t\in\rrbracket\underline\alpha^1_{k},\overline\alpha^1_{k}\rrbracket$.
+
+\paragraph{Update rule}
+Let us fix $k<K$ and assume that we know $C_{k,t,A}$ for all $t$.
+Then for all $t$ in $\rrbracket \underline\alpha^1_{k+1},
+\overline\alpha^1_{k+1}\rrbracket$ we have the update formula:
+
+
+\begin{equation}
+  \label{eq:update}
+  C_{k+1,t,A} = \min_{ 
+  \tau \in \rrbracket \underline\alpha^1_{k}, \overline\alpha^1_{k} \rrbracket
+}
+\{ 
+C_{k,\tau ,A} + 
+\min_{\mu} \{\sum_{i = \tau+1}^t (Y_i - \mu)^2 \} 
+\}
+\end{equation}
+
+In the case where we have overlapping regions the update rule is
+slightly different and becomes:
+
+\begin{equation}
+  \label{eq:update_overlapping}
+  C_{k+1,t,A} = \min_{ 
+  \tau \in \rrbracket \underline\alpha^1_{k}, \min(\overline\alpha^1_{k}, t-1) \rrbracket
+}
+\{ 
+C_{k,\tau ,A} + 
+\min_{\mu} \{\sum_{i = \tau+1}^t (Y_i - \mu)^2 \} 
+\}
+\end{equation}
+
+\paragraph{Initialization and last step}
+The initialization is straightforward. We just need to compute for $t$
+in $\rrbracket \underline\alpha^1_{1},
+\overline\alpha^1_{1}\rrbracket$:
+ \begin{equation}
+   \label{eq:initial}
+    C_{1,t,A} = \min_{\mu} \{\sum_{i = 1}^t (Y_i - \mu)^2 \} 
+ \end{equation}
+The last step of the algorithm is done using the update rule for $k =
+K$ and $t=d$.
+
+We implemented these rules in a dynamic programming algorithm
+available in the \pkg{SegAnnot} package.
+
+\paragraph{Complexity}
+To compute $C_{k+1,t,A}$ we need to perform
+ $(\overline\alpha^1_{k} - \underline\alpha^1_{k})$ operations.
+To get all $C_{k+1,t,A}$ we thus need
+$(\overline\alpha^1_{k} - \underline\alpha^1_{k})(\overline\alpha^1_{k+1} - \underline\alpha^1_{k+1})$ operations. 
+%If we define $\overline\alpha^1_{0}=\overline\alpha^1=0$ and 
+%$\overline\alpha^1_{K+1}=\overline\alpha^1_{K+1}=n$,
+Overall the number of operations is
+\begin{equation}
+  \label{eq:complexity}
+  \sum_{k=1}^{K-1}
+ (\overline\alpha^1_{k} - \underline\alpha^1_{k} )
+ (\overline\alpha^1_{k+1} - \underline\alpha^1_{k+1}) 
+  .
+\end{equation}
+
+If the annotations are not overlapping, then the number of operations
+is always smaller than $d^2$.  Indeed we have
+\begin{equation}
+  \label{eq:complexity}
+  \sum_{k=1}^{K-1}
+ (\overline\alpha^1_{k} - \underline\alpha^1_{k} )
+ (\overline\alpha^1_{k+1} - \underline\alpha^1_{k+1}) 
+\leq
+ \left(
+   \sum_{k=1}^{K}
+ (\overline\alpha^1_{k} - \underline\alpha^1_{k})
+ \right)^2 
+\leq d^2
+  ,
+\end{equation}
+and we get a complexity of $O(d^2)$.  This worst case scenario is
+reached when we have two successive regions of size $(d-K)/2$.  If the
+regions are of size $d/K$ we get a complexity of $O(d^2/K)$.  However,
+if the annotations are overlapping the number of operations is
+$O(Kd^2)$.
+
+In our experience, annotations define relatively small and
+non-overlapping regions of the profile. So in practice
+$\sum_{k=1}^{K-1} (\overline\alpha^1_{k} - \underline\alpha^1_{k}
+)(\overline\alpha^1_{k+1} - \underline\alpha^1_{k+1}) $ is usually much
+smaller than $d^2$. This often results in fast run times in practice
+on real data.
+
+
+\section{Only 0, 1 and $b$ annotations}
+Now let us consider the case were the number of breaks per annotated
+regions is unique.  Obviously for a region of size $n$ we cannot have
+more than $n-1$ breaks.  In fact, we can easily convert this problem
+to a problem with only 0/1 annotations.  First, assume that we expect
+$a_j=b$ breaks in the $j$-th region $A_j=[\overline\alpha_j,
+\underline\alpha_j]$.  The $m$-th break of this region is between
+$[\overline\alpha_j +m -1 , \underline\alpha_j - b + m] $.  Thus, we
+can replace the region $A_j$ with $b$ regions annotated to have
+exactly 1 breakpoint.
+
+\newpage
+
+
+\section{Results}
+
+% For now, omit the speed section since that requires another
+% annotation data set.
+
+% \subsection{Speed of annotation-aware DP}\label{sec:speed}
+
+% We ran the annotation-aware algorithm (SegAnnot) on signals with
+% complete 0/1 annotations, and compared the training time to the usual
+% annotation-based model selection procedure cghseg.$k_{\text{max}}$,
+% for $k_{\text{max}}\in\{4,20,50\}$. For cghseg.ann, we use the number
+% of breakpoint annotations to pick $k_{\text{max}}$ instead of the
+% usual model selection procedure.
+
+% \includegraphics[width=\textwidth]{figure-training-time}
+
+% \pkg{SegAnnot} is fast. In fact it is faster than the pruned DP with
+% model selection (cghseg.$k_{\text{max}}$), especially for larger data
+% sets and larger $k_{\text{max}}$ values.  This is expected, since the
+% \pkg{SegAnnot} algorithm only searches for breakpoints in regions with
+% 1-breakpoint annotations.  
+
+%\newpage
+
+\subsection{Fitting 0/1 annotations perfectly}
+
+In this section, we show that the \pkg{SegAnnot} algorithm can find a
+consistent segmentation for the motivating examples that we saw in
+Section~\ref{motivating_examples}. In the two figures below, we show
+the segmentation recovered by the \pkg{SegAnnot} algorithm for these
+two examples.
+
+<<frontpage-SegAnnot>>=
+chr <- profiles$lo$pro
+regions <- profiles$lo$ann
+result <- SegAnnotBases(chr$logratio,chr$position,regions$min,regions$max)
+
+lwd <- 1
+p <- ggplot()+
+  geom_tallrect(aes(xmin=first.base/1e6,xmax=last.base/1e6,fill=annotation),
+                data=result$ann.df,colour="black")+
+  geom_point(aes(base/1e6,signal),data=result$signal.df)+
+  geom_vline(aes(xintercept=base/1e6),
+             linetype="dashed",colour=signal.colors["estimate"],
+             data=result$break.df,lwd=lwd)+
+  geom_segment(aes(first.base/1e6,mean,xend=last.base/1e6,yend=mean),
+               data=result$seg.df,lwd=lwd,
+               colour=signal.colors["estimate"])+
+  scale_fill_manual(values=breakpoint.colors)+
+  xlab("position on chromosome 17 (mega base pairs)")
+print(p)
+@ 
+
+<<problematic-SegAnnot>>=
+pro <- profiles$hi
+chr <- pro$pro
+results <- with(chr,run.cghseg(logratio,position,13))
+anns <- pro$ann
+break.anns <- subset(anns,annotation=="1breakpoint")
+seg <- SegAnnotBases(chr$logratio,chr$position,break.anns$min,break.anns$max)
+
+win <- function(min,max)data.frame(min=min*1e5,max=max*1e5)
+windows <- rbind(win(  65,  71),
+                 win( 148, 171),
+                 win( 355, 361),
+                 win(1060,1065))
+anns$mid <- with(anns,(min+max)/2)
+chr.df <- data.frame()
+ann.df <- data.frame()
+seg.df <- data.frame()
+breaks <- data.frame()
+for(i in 1:nrow(windows)){
+  w <- windows[i,]
+  sm.df <- subset(seg$seg.df,!(first.base>w$max | last.base<w$min))
+  sm.df$first.base[sm.df$first.base < w$min] <- w$min
+  sm.df$last.base[sm.df$last.base > w$max] <- w$max
+  win.breaks <- subset(seg$break.df,w$min < base & base < w$max)
+  if(nrow(win.breaks)){
+    breaks <- rbind(breaks,{
+      data.frame(win.breaks,i)
+    })
+  }
+  seg.df <- rbind(seg.df,{
+    data.frame(sm.df,i)
+  })
+  chr.df <- rbind(chr.df,{
+    data.frame(subset(chr,w$min < position & position < w$max),i)
+  })
+  ann.df <- rbind(ann.df,{
+    data.frame(subset(anns,w$min < mid & mid < w$max),i)
+  })
+}
+labeller <- function(var,val){
+  if(var=="segments"){
+    s <- ifelse(val==1,"","s")
+    sprintf("%s segment%s",val,s)
+  }else{
+    sprintf("window %d",val)
+  }
+}
+br <- c(6.5,7.0,seq(15,17,by=0.5),35.5,36,106,106.5)
+names(br) <- as.character(br)
+p <- ggplot()+
+  geom_tallrect(aes(xmin=min/1e6,xmax=max/1e6,fill=annotation),
+                colour="black",data=ann.df)+
+  geom_point(aes(position/1e6,logratio),data=chr.df)+
+  geom_segment(aes(first.base/1e6,mean,xend=last.base/1e6,yend=mean),
+               data=seg.df,colour=signal.colors[["estimate"]],lwd=1)+
+  geom_vline(aes(xintercept=base/1e6),data=breaks,
+             colour=signal.colors[["estimate"]],linetype="dashed",lwd=1)+
+  scale_fill_manual(values=breakpoint.colors)+
+  facet_grid(.~i,scales="free",space="free",labeller=labeller)+
+  scale_x_continuous("position on chromosome 2 (mega base pairs)",
+                     breaks=br)
+print(p)
+@ 
+
+Clearly, the \pkg{SegAnnot} algorithm is able to find a segmentation
+consistent with the expert's annotations, which was not true of the
+maximum-likelihood segmentations given by the pruned DP algorithm.
+
+\newpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{0, 0+, 1 and 1+ annotations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Although not yet implemented in the \pkg{SegAnnot} package, we could
+build on these ideas to define a segmentation for more complicated
+signals with 0+ and 1+ annotations.
+
+Here are the key ideas of the 0/1 algorithm:
+\begin{itemize}
+\item the number of changes before a possible change at data-point $t$ in the $(k+1)$-th 1-region is necesarily $k$.
+\item the position of the previous change before a possible change at $t$ in the $(k+1)$-th 1-region is restricted to the $k$-th 1-region.
+\end{itemize}
+
+The algorithm in the 0/0+/1/1+ case is conceptually the same, the main difference is that
+\begin{itemize}
+\item the number of changes before a possible change at data-point $t$ is not unique (but it can be restricted).
+\item the set possible changes before a change at $t$ includes but is not necesarily restricted to the previous 1-region.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Some more notation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+To properly define the algorithm in the general case we need to introduce some more notation.
+We define $I_l$ as the annotation status of the $l$-th annotation region (0, 0+, 1 or 1+).
+We define $\check{k}_l$ as the minimum number of breaks in region ($l$: $M_l = 1$ if $I_l = 1$ or $1+$ and $M_l =0$ otherwise).
+The function $l$ map any data-point $t$ to its given annotation region:  $ l(t) = \{ l | t \in [\overline\alpha_{l} - \underline\alpha_{l}] \}$. $K_{\max}$ is the maximum number of changes authorised by the user. We assume that $K_{\max} \geq \overleftarrow{k}_{l(n)}$
+ 
+Then we get that 
+\begin{itemize}
+\item the minimum number of changes before region $l$ is $\overleftarrow{k}_l = \sum_{j <k} M_j$
+\item the minimum number of changes after region $l$ is $\overrightarrow{k}_l = \sum_{j >k} M_j$
+\item the minimum number of changes before $t$ is $\overleftarrow{k}_{l(t)}$
+\item the maximum number of changes before $t$ is $K_{\max} - \overrightarrow{k}_{l(t)}$.
+\end{itemize}
+
+For region $l$ we can define the closest 1 or 1+ region to the left:
+$$\overleftarrow{1}_l =  \argmax_{j < l} \{ M_{j}= 1  \}.$$
+
+Let $V_l = \cup_{\overleftarrow{1}_l \leq j < l | I_j \neq 0} \llbracket
+\underline\alpha_{j}, \overline\alpha^1_{j}\rrbracket.$
+
+The set of possible changes just before a change at $t$ is called $V(t)$ and is:
+\begin{itemize}
+\item $V(t) = V_{l(t)}$ if $I_l(t) = 1$ 
+\item $V(t) = V_{l(t)} \cup \llbracket \underline\alpha_{j}, t-1 \rrbracket$ if $I_l(t) = 1+$ or $I_l(t) = 0+$
+\item $V(t) = \emptyset$ if $I_l(t) = 0$
+\end{itemize}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Update rule}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+For any $t$ such that $I_{l(t)} \neq 0$ and $k+1$ such that
+$\overleftarrow{k}_l \leq k+1 \leq K_{\max} - \overrightarrow{k}_l$
+the update rule is $$ C_{k+1,t,A} = \min_{ \tau \in V(t)} \{
+C_{k,\tau ,A} + \min_{\mu} \{\sum_{i = \tau}^t (Y_i - \mu)^2 \} \}. $$
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Initialization}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+For the initialization we define the set of possible position for the
+first change
+$$ V' = \cup_{l \leq \argmin_{l } \{ M_l = 1  \}} [\overline\alpha_{l} - \underline\alpha_{l}]. $$
+Then for any $t$ in $V'$ we use
+$$ C_{1,t,A} = \min_{\mu} \{\sum_{i = 1}^t (Y_i - \mu)^2 \}. $$
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Last step}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+For the last step we need to recover the minimum and maximum number of changes at $t=n$ and apply the update rule for all $k$ in this range.
+This minimum and maximum are respectively $\overleftarrow{k}_{l(n)}$ and $K_{\max} - \overrightarrow{k}_{l(n)}$.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusions and future work}
+
+The \pkg{SegAnnot} package provides a new segmentation model for noisy
+observations from annotated piecewise constant signals. It takes as
+input the observations and a set of 0/1 breakpoint annotations, and
+returns the precise locations of the most likely breakpoints. We
+showed empirically that its \textbf{Speed} is as fast if not faster
+than pruned DP. Additionally, we showed 2 cases where pruned DP yields
+no consistent models, so \pkg{SegAnnot} can be used for
+\textbf{Fitting} the annotations in these cases.
+
+For the future, it may be interesting to implement the 0/1/0+/1+
+algorithm.
+
+% \begin{enumerate}
+% \item How does the ratio $|\mathcal M_{K,d,A}|/|\mathcal M_{K,d}|$
+%   compare to the speedup observed in the algorithm?
+% \item How to estimate $\sigma$? (pair difference or annotated
+% segmentation) Can we compare to other really simple model selection
+% criteria i.e. pick the point where the second derivative is maximal?
+% \item Should we estimate $\lambda$ (trade off between model complexity
+% and fit) or estimate the variance $\sigma$? How?
+% \item To estimate $\lambda$ which algo shows the smallest test error
+% (annotated or not annotated version of the algo)?
+% \item Is there systematic bias when we estimate $\lambda$ using the
+% annotated version of the algorithm?
+% \item When choosing between different values of $k$ for which the
+% annotation error is the same, should we choose the $\lambda$ value in
+% the middle, or the $k$ for which we have the most $\lambda$ values?
+% The latter approach seems to be more consistent with the elbow rule.
+% \end{enumerate}
+
+\bibliographystyle{abbrvnat}
+\bibliography{refs}
+
+\end{document}
+ 

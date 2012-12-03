@@ -2,11 +2,7 @@
 \alias{smoothedSignal}
 \title{smoothedSignal}
 \description{Calculate the vector of smoothed observations.}
-\usage{
-smoothedSignal(x,
-saut,
-method = mean)
-}
+\usage{smoothedSignal(x, saut, method = mean)}
 \arguments{
   \item{x}{
 }
