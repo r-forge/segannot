@@ -156,7 +156,7 @@ The second example we show is a high-density array with 153,663 probes
 on chromosome 2. We zoom into 4 windows of interest in the plot below,
 showing only 3,068 of the probes.
 
-<<problematic,height=5.5>>=
+<<problematic,height=6>>=
 pro <- profiles$hi
 chr <- pro$pro
 results <- with(chr,run.cghseg(logratio,position,13))
