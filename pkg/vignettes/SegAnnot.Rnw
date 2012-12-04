@@ -99,7 +99,7 @@ chromosome on a low-density array as $d=123$ black points.
 
 \SweaveOpts{fig=TRUE,width=7,height=3,results=hide,echo=FALSE}
 
-<<frontpage>>=
+<<frontpage,height=4.5>>=
 library(SegAnnot)
 library(ggplot2)
 data(profiles)
@@ -156,7 +156,7 @@ The second example we show is a high-density array with 153,663 probes
 on chromosome 2. We zoom into 4 windows of interest in the plot below,
 showing only 3,068 of the probes.
 
-<<problematic>>=
+<<problematic,height=5.5>>=
 pro <- profiles$hi
 chr <- pro$pro
 results <- with(chr,run.cghseg(logratio,position,13))
@@ -225,7 +225,7 @@ flat region (yellow) as soon as $k\geq5$.  To show detail of windows
 3 and 4, we zoom in the plot below to clearly show their small
 $\approx 10$kb losses.
 
-<<zoom>>=
+<<zoom,height=2>>=
 win <- function(min,max)data.frame(min=min*1e5,max=max*1e5)
 windows <- rbind(win(100,101),##keep these
                  win(200,201),## two dummy windows
@@ -283,6 +283,8 @@ p <- ggplot()+
                      breaks=c(seq(35800,35900,by=20),seq(106230,106270,by=20)))
 print(p)
 @ 
+
+\newpage
 
 The fact that the maximum-likelihood segmentation sometimes cannot
 match the expert's annotations is unsatisfying. In those cases, one
