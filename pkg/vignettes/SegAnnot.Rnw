@@ -867,10 +867,10 @@ The \pkg{SegAnnot} package provides a new segmentation model for noisy
 observations from annotated piecewise constant signals. It takes as
 input the observations and a set of 0/1 breakpoint annotations, and
 returns the precise locations of the most likely breakpoints. We
-showed empirically that its \textbf{Speed} is as fast if not faster
-than pruned DP. Additionally, we showed 2 cases where pruned DP yields
-no consistent models, so \pkg{SegAnnot} can be used for
-\textbf{Fitting} the annotations in these cases.
+showed 2 cases where pruned DP yields no consistent models, so
+\pkg{SegAnnot} can be used for \textbf{Fitting} the annotations in
+these cases.
+%Additionally, we showed empirically that its \textbf{Speed} is as fast if not faster than pruned DP. 
 
 For the future, it may be interesting to implement the 0/1/0+/1+
 algorithm.
