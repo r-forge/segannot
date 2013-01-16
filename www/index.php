@@ -43,7 +43,16 @@ echo $contents; } ?>
 
 <!-- end of project description -->
 
-<p> No content added. </p>
+<p>
+The SegAnnot package implements a dynamic programming algorithm for
+annotation-aware segmentation. Install the package and read the
+vignette to find out why this algorithm is useful, and how it works.
+</p>
+
+<pre>
+install.packages("SegAnnot",repos="http://r-forge.r-project.org")
+vignette("SegAnnot",package="SegAnnot")
+</pre>
 
 <p> The <strong>project summary page</strong> you can find <a href="http://<?php echo $domain; ?>/projects/<?php echo $group_name; ?>/"><strong>here</strong></a>. </p>
 
