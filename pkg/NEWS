@@ -2,6 +2,8 @@ TODO
 
 1.1 --- 25 Jan 2013
 
+objname="tallrect" for geom_tallrect.
+
 profiles Rd revised.
 
 tech report converted to vignette Rnw format.

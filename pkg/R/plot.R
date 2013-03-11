@@ -9,6 +9,7 @@ geom_tallrect <- function
   require(proto)
   require(ggplot2)
   GeomTallRect <- proto:::proto(ggplot2:::GeomRect,{
+    objname <- "tallrect"
     required_aes <- c("xmin", "xmax")
     draw <- draw_groups <- function(.,data,scales,coordinates,
                                     ymin=0,ymax=1,...){
