@@ -85,12 +85,19 @@ SegAnnot <- structure(function
 ### Ends of the 1-annotated regions.
  ){
   stopifnot(length(sR)==length(eR))
+  stopifnot(is.numeric(x))
+  nMax <- length(x)
+  for(i in list(sR,eR)){
+    stopifnot(is.integer(i))
+    stopifnot(all(i >= 1))
+    stopifnot(all(i <= nMax))
+  }
+  stopifnot(all(eR > sR))
   ## sort them first, in case they are not specified in increasing
   ## order.
   ord <- order(sR)
   sR <- sR[ord]
   eR <- eR[ord]
-  nMax <- length(x)
   sR = as.integer(sR-1)
   eR = as.integer(eR-1)
   sR = c(sR, nMax-1)

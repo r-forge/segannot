@@ -1,8 +1,9 @@
 
 #include "FindOptimalSegmentations.h"
 
-void bridge_FindOptimalSegmentations(double * x, int * sR, int * eR, int * nMax, int * pMax, 
-	int * idPath, double * cost)
+void bridge_FindOptimalSegmentations(
+    double * x, int * sR, int * eR, 
+    int * nMax, int * pMax, int * idPath, double * cost)
 {
     //printf("nMax: %d\n", nMax[0]);
 	//printf("pMax: %d\n", pMax[0]);
@@ -10,6 +11,7 @@ void bridge_FindOptimalSegmentations(double * x, int * sR, int * eR, int * nMax,
 	//printf("Region Start: %d - ... - %d\n", sR[0], sR[pMax[0]-1]);
 	//printf("Region End: %d - ... - %d\n", eR[0], eR[pMax[0]-1]);
 
-	FindOptimalSegmentations(x, (unsigned *) sR, (unsigned *) eR, (unsigned) *nMax, (unsigned) *pMax, 
-				(unsigned *) idPath, cost);
+	FindOptimalSegmentations(
+	    x, (unsigned *) sR, (unsigned *) eR, 
+	    (unsigned) *nMax, (unsigned) *pMax, (unsigned *) idPath, cost);
 }

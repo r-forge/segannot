@@ -1,6 +1,3 @@
-#include <R.h>
-#include <Rinternals.h>
-
 //////////////////////////////////
 //                              //
 //  FindOptimalSegmentations.c  //
@@ -13,8 +10,9 @@
 #include <math.h>
 // Assume that the last annotated region is [n-1, n-1] //
 // Assume pMax >= 2
-void FindOptimalSegmentations(const double * x, const unsigned *sR, const unsigned *eR, const unsigned nMax,  
-			const unsigned pMax, unsigned * iDPath, double * cost)
+void FindOptimalSegmentations(
+    const double * x, const unsigned *sR, const unsigned *eR, 
+    const unsigned nMax, const unsigned pMax, unsigned * iDPath, double * cost)
 {
 	//printf("Cumulative sum \n");
     // Cumulative sum of x //
