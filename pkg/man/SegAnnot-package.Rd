@@ -1,5 +1,6 @@
 \name{SegAnnot-package}
 \alias{SegAnnot-package}
+\alias{SegAnnot}
 \docType{package}
 \title{Annotation-aware segmentation via dynamic programing}
 \description{The SegAnnot package provides a function
