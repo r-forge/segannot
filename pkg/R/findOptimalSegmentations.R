@@ -87,6 +87,7 @@ SegAnnot <- structure(function
   stopifnot(length(sR)==length(eR))
   stopifnot(is.numeric(x))
   nMax <- length(x)
+  stopifnot(nMax > 1)
   for(i in list(sR,eR)){
     stopifnot(is.integer(i))
     stopifnot(all(i >= 1))
