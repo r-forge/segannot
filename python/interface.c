@@ -52,11 +52,19 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
     int *startsA = (int*)PyArray_DATA(starts);
     int *endsA = (int*)PyArray_DATA(ends);
     // Initialize data for return vals.
-    PyObject *segStart = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
+    npy_intp n_segments = n_starts+1;
+    PyObject *segStart = PyArray_SimpleNew(1,&n_segments,PyArray_INT);
     int *segStartA = (int*)PyArray_DATA(segStart);
+    PyObject *segEnd = PyArray_SimpleNew(1,&n_segments,PyArray_INT);
+    int *segEndA = (int*)PyArray_DATA(segEnd);
+    PyObject *bkpts = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
+    int *bkptsA = (int*)PyArray_DATA(bkpts);
+    PyObject *segMean = PyArray_SimpleNew(1,&n_segments,PyArray_DOUBLE);
+    double *segMeanA = (double*)PyArray_DATA(segMean);
     int status = SegAnnotBases( 
 	signalA, baseA, startsA, endsA, 
-	n_signal, n_starts, segStartA);
+	n_signal, n_starts, 
+	segStartA, segEndA, bkptsA, segMeanA);
     if(status == ERROR_BASES_NOT_INCREASING){
 	PyErr_SetString(PyExc_TypeError,
 			"bases not increasing");
@@ -73,9 +81,11 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
 	return NULL;
     }
 
-    //segStart is an array of 0-indexed indices of the first probe on
-    //the 2nd, ..., kth segment.
-    return segStart;
+    return Py_BuildValue("{s:N,s:N,s:N,s:N}",
+			 "start",segStart,
+			 "end",segEnd,
+			 "bkpts",bkpts,
+			 "mean",segMean);
 }
 
 static PyMethodDef Methods[] = {

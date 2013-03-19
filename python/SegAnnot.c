@@ -8,7 +8,7 @@ int SegAnnotBases(
     const int *first_base, const int *last_base, 
     const int nMax, const int n_regions, 
     // need to calculate the path of optimal breaks:
-    int * segStart) {
+    int * segStart, int * segEnd, int *bkpts, double * segMean) {
 
     int p, n, i;
     for(p=0; p<n_regions; p++){
@@ -148,23 +148,53 @@ int SegAnnotBases(
 	
     // Finish //
     //printf("Finish %d, %d \n", n_regions-1, M[n_regions-1][0]);
-    segStart[n_regions-1] = M[n_regions][0];
+    int *break_before = (int*)malloc(sizeof(int)*n_regions);
+    break_before[n_regions-1] = M[n_regions][0];
     //cost[0] = C[n_regions-1][0];
     //printf("Retour %d, %f\n", M[n_regions-1][0], C[n_regions-1][0]);
     for ( p = n_regions-2; p >= 0; --p) 
     {
-	//printf("Retour %d, %d, %d\n", p, segStart[p+1], M[p][segStart[p+1]]);
-	segStart[p] = M[p+1][segStart[p+1]];
+	//printf("Retour %d, %d, %d\n", p, break_before[p+1], M[p][break_before[p+1]]);
+	break_before[p] = M[p+1][break_before[p+1]];
     }
     for(p=0;p<n_regions;p++){
-	segStart[p] += sR[p] + 1;
+	break_before[p] += sR[p] + 1;
     }
-	
-
+    // At this point break_before is an array of 
+    // length n_regions, containing 0-indexed indices
+    // of the first probe on
+    // the 2nd, ..., kth segment.
+    
+    // Translate back to base pairs.
+    int *first_probe = (int*)malloc(sizeof(int)*pMax);
+    int *last_probe = (int*)malloc(sizeof(int)*pMax);
+    first_probe[0] = 0;
+    last_probe[pMax-1] = nMax-1;
+    for(p=0; p<n_regions; p++){
+	i = break_before[p];
+	first_probe[p+1] = i;
+	last_probe[p] = i-1;
+	bkpts[p] = (base[i]+base[i-1])/2;
+    }
+    // Calculate segment means.
+    double total;
+    for(p=0; p<pMax; p++){
+	segStart[p] = base[first_probe[p]];
+	segEnd[p] = base[last_probe[p]];
+	total = 0;
+	for(i=first_probe[p]; i<=last_probe[p]; i++){
+	    total += x[i];
+	}
+	segMean[p] = total/(last_probe[p]-first_probe[p]+1);
+	printf("%6d %6d %10d %10d %10f\n", first_probe[p]+1, last_probe[p]+1,
+	       segStart[p], segEnd[p], segMean[p]);
+    }
     // Free allocated object //
     //printf("Free \n");
+    free(first_probe);
+    free(last_probe);
     free(sx);
-	
+    free(break_before);
     for ( p = 0; p < pMax; ++p)
     {
 	free(C[p]);
