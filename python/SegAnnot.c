@@ -148,13 +148,13 @@ int SegAnnotBases(
 	
     // Finish //
     //printf("Finish %d, %d \n", n_regions-1, M[n_regions-1][0]);
-    segStart[n_regions-1] = M[n_regions-1][0];
+    segStart[n_regions-1] = M[n_regions][0];
     //cost[0] = C[n_regions-1][0];
     //printf("Retour %d, %f\n", M[n_regions-1][0], C[n_regions-1][0]);
     for ( p = n_regions-2; p >= 0; --p) 
     {
 	//printf("Retour %d, %d, %d\n", p, segStart[p+1], M[p][segStart[p+1]]);
-	segStart[p] = M[p][segStart[p+1]];
+	segStart[p] = M[p+1][segStart[p+1]];
     }
     for(p=0;p<n_regions;p++){
 	segStart[p] += sR[p] + 1;

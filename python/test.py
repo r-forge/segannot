@@ -19,16 +19,12 @@ for prefix, types in TABLES.iteritems():
     for tup in r:
         entries = zip(header, tup, types)
         for name, item, fun in entries:
-            if name == "annotation" and item == "0breakpoints":
-                pass
-            else:
-                data[prefix][name].append(fun(item))
-
+            data[prefix][name].append(fun(item))
 ## re-order annotations.
 ann_tups = zip(*data["annotations"].values())
 ann_tups.sort()
 for i, k in enumerate(data["annotations"]):
-    data["annotations"][k] = [t[i] for t in ann_tups]
+    data["annotations"][k] = [t[i] for t in ann_tups if t[1]=="1breakpoint"]
 dtypes={
     "min":numpy.int32,
     "max":numpy.int32,
@@ -44,6 +40,6 @@ result = SegAnnotBases(arrays["probes_logratio"],
                        arrays["probes_position"],
                        arrays["annotations_min"],
                        arrays["annotations_max"])
-
+print result
 #out = open("segmentation-python.csv", "w")
  

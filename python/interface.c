@@ -73,6 +73,8 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
 	return NULL;
     }
 
+    //segStart is an array of 0-indexed indices of the first probe on
+    //the 2nd, ..., kth segment.
     return segStart;
 }
 
