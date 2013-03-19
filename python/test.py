@@ -41,5 +41,7 @@ result = SegAnnotBases(arrays["probes_logratio"],
                        arrays["annotations_min"],
                        arrays["annotations_max"])
 print result
-#out = open("segmentation-python.csv", "w")
+for name, a in result.iteritems():
+    out = name + ".txt"
+    a.tofile(out," ")
  
