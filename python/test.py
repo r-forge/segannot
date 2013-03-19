@@ -24,14 +24,26 @@ for prefix, types in TABLES.iteritems():
             else:
                 data[prefix][name].append(fun(item))
 
+## re-order annotations.
+ann_tups = zip(*data["annotations"].values())
+ann_tups.sort()
+for i, k in enumerate(data["annotations"]):
+    data["annotations"][k] = [t[i] for t in ann_tups]
+dtypes={
+    "min":numpy.int32,
+    "max":numpy.int32,
+    "position":numpy.int32,
+    "logratio":numpy.float,
+    "annotation":numpy.str,
+}
 arrays = {}
 for prefix, d in data.iteritems():
     for name, items in d.iteritems():
-        arrays[prefix+"_"+name] = numpy.array(items)
-
+        arrays[prefix+"_"+name] = numpy.array(items,dtypes[name])
 result = SegAnnotBases(arrays["probes_logratio"],
                        arrays["probes_position"],
                        arrays["annotations_min"],
                        arrays["annotations_max"])
 
 #out = open("segmentation-python.csv", "w")
+ 

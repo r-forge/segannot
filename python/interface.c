@@ -2,28 +2,9 @@
 #include <numpy/arrayobject.h>
 #include "SegAnnot.h"
 
-/* PyObject * tree2py(Cluster *c){ */
-/*   PyObject *alpha,*lambda,*i; */
-/*   double *alpha_ptr,*lambda_ptr; */
-/*   int *i_ptr; */
-/*   npy_intp dim=c->total; */
-/*   alpha =PyArray_SimpleNew(1,&dim,PyArray_DOUBLE); */
-/*   lambda=PyArray_SimpleNew(1,&dim,PyArray_DOUBLE); */
-/*   i     =PyArray_SimpleNew(1,&dim,PyArray_INT); */
-/*   alpha_ptr =(double*)PyArray_DATA(alpha); */
-/*   lambda_ptr=(double*)PyArray_DATA(lambda); */
-/*   i_ptr     =(int*)   PyArray_DATA(i); */
-/*   int row=0; */
-/*   add_results(c,alpha_ptr,lambda_ptr,i_ptr,&row); */
-/*   return Py_BuildValue("{s:O,s:O,s:O}", */
-/* 		       "alpha",alpha, */
-/* 		       "lambda",lambda, */
-/* 		       "i",i); */
-/* } */
-
 static PyObject *
 SegAnnotBases2Py(PyObject *self, PyObject *args){
-    PyArrayObject *signal, *base, *starts, *ends, *segStart; //borrowed
+    PyArrayObject *signal, *base, *starts, *ends; //borrowed
     if(!PyArg_ParseTuple(args, "O!O!O!O!",
 			 &PyArray_Type, &signal,
 			 &PyArray_Type, &base,
@@ -37,17 +18,17 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
 			"signal must be numpy.ndarray type double");
 	return NULL;
     }
-    if(PyArray_TYPE(base)!=PyArray_INT64){
+    if(PyArray_TYPE(base)!=PyArray_INT){
 	PyErr_SetString(PyExc_TypeError,
 			"base must be numpy.ndarray type int");
 	return NULL;
     }
-    if(PyArray_TYPE(starts)!=PyArray_INT64){
+    if(PyArray_TYPE(starts)!=PyArray_INT){
 	PyErr_SetString(PyExc_TypeError,
 			"starts must be numpy.ndarray type int");
 	return NULL;
     }
-    if(PyArray_TYPE(ends)!=PyArray_INT64){
+    if(PyArray_TYPE(ends)!=PyArray_INT){
 	PyErr_SetString(PyExc_TypeError,
 			"ends must be numpy.ndarray type int");
 	return NULL;
@@ -71,9 +52,9 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
     int *startsA = (int*)PyArray_DATA(starts);
     int *endsA = (int*)PyArray_DATA(ends);
     // Initialize data for return vals.
-    segStart = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
+    PyObject *segStart = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
     int *segStartA = (int*)PyArray_DATA(segStart);
-    int status = SegAnnotBases(
+    int status = SegAnnotBases( 
 	signalA, baseA, startsA, endsA, 
 	n_signal, n_starts, segStartA);
     if(status == ERROR_BASES_NOT_INCREASING){
@@ -91,6 +72,7 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
     if(status != 0){
 	return NULL;
     }
+
     return segStart;
 }
 
@@ -103,8 +85,6 @@ static PyMethodDef Methods[] = {
 PyMODINIT_FUNC
 initSegAnnot
 (void){
+    (void)Py_InitModule("SegAnnot",Methods);
     import_array();//necessary from numpy otherwise we crash with segfault
-    PyObject *m=Py_InitModule("SegAnnot",Methods);
-    if(m==NULL)
-	return;
 }
