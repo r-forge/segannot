@@ -1,5 +1,9 @@
 TODO
 
+1.2 --- 19 Mar 2013
+
+Port SegAnnotBases to C code, for easier porting to python.
+
 1.1 --- 25 Jan 2013
 
 objname="tallrect" for geom_tallrect.

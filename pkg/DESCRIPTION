@@ -1,6 +1,5 @@
 Package: SegAnnot
-Version: 1.1
-Date: 2013-01-25
+Version: 1.2
 Title: Annotation-aware segmentation via dynamic programing
 License: Unlimited
 Description: The SegAnnot package provides a function
