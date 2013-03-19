@@ -175,19 +175,28 @@ int SegAnnotBases(
 	first_probe[p+1] = i;
 	last_probe[p] = i-1;
 	bkpts[p] = (base[i]+base[i-1])/2;
+	//printf("%d\n",bkpts[p]);
     }
     // Calculate segment means.
     double total;
     for(p=0; p<pMax; p++){
-	segStart[p] = base[first_probe[p]];
-	segEnd[p] = base[last_probe[p]];
+	if(p==0){
+	    segStart[p] = base[0];
+	}else{
+	    segStart[p] = bkpts[p-1];
+	}
+	if(p==pMax-1){
+	    segEnd[p] = base[nMax-1];
+	}else{
+	    segEnd[p] = bkpts[p];
+	}
 	total = 0;
 	for(i=first_probe[p]; i<=last_probe[p]; i++){
 	    total += x[i];
 	}
 	segMean[p] = total/(last_probe[p]-first_probe[p]+1);
-	printf("%6d %6d %10d %10d %10f\n", first_probe[p]+1, last_probe[p]+1,
-	       segStart[p], segEnd[p], segMean[p]);
+	//printf("%6d %6d %10d %10d %10f\n", first_probe[p]+1, last_probe[p]+1,
+	//     segStart[p], segEnd[p], segMean[p]);
     }
     // Free allocated object //
     //printf("Free \n");
