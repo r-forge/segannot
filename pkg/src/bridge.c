@@ -15,3 +15,18 @@ void bridge_FindOptimalSegmentations(
 	    x, (unsigned *) sR, (unsigned *) eR, 
 	    (unsigned) *nMax, (unsigned) *pMax, (unsigned *) idPath, cost);
 }
+
+void bridge_bases(
+    double * x, int * base, 
+    int * starts, int * ends,  // in bases, length n_regions.
+    int * sR, int * eR, // indices, length n_regions+1.
+    int * nMax, int * n_regions, 
+    int * idPath, int *status, 
+    double *cost) {
+    *status = bases(
+	x, (unsigned *) base,
+	(unsigned *) starts, (unsigned *) ends, 
+	(unsigned *) sR, (unsigned *) eR,
+	(unsigned) *nMax, (unsigned) *n_regions, 
+	(unsigned *) idPath, cost);
+}

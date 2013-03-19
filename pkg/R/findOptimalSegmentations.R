@@ -111,9 +111,10 @@ SegAnnot <- structure(function
                as.integer(nMax), as.integer(pMax), as.integer(idPath),
                as.double(cost))
   names(result) <- c("x", "sR", "eR", "nMax", "pMax", "idPath", "cost")
-  saut = c(0, sR+1)+ c(result$idPath, 0)
-  smt <- smoothedSignal(x, saut, method=mean)
-  return(list(change=saut, smt=smt, cost = result$cost + sum(x^2)))
+  result$change <- c(0, sR+1)+ c(result$idPath, 0)
+  result$smt <- smoothedSignal(x, result$change, method=mean)
+  result$cost <- result$cost + sum(x^2)
+  result
 ### List describing the segmentation model.
 },ex = function(){
   set.seed(1)
@@ -127,6 +128,97 @@ SegAnnot <- structure(function
   eR = as.integer(c(2100, 5000))
   result2 <- SegAnnot(x, sR, eR)
   which(diff(result2$smt)!=0)
+})
+
+SegAnnotBasesC <- structure(function
+### C implementation of mapping bases to indices.
+(y,
+### The vector of observations to segment.
+ base,
+### Position of each observation in base pairs.
+ starts,
+### Starts of the 1-annotated regions in base pairs.
+ ends
+### Ends of the 1-annotated regions in base pairs.
+ ){
+  stopifnot(length(y)==length(base))
+  stopifnot(is.numeric(y))
+  stopifnot(is.integer(base))
+  stopifnot(length(starts)==length(ends))
+  stopifnot(is.integer(starts))
+  stopifnot(is.integer(ends))
+  ## sort the bases/signal in case they are not specified in
+  ## increasing order.
+  ord <- order(base)
+  y <- y[ord]
+  base <- base[ord]
+  nMax <- length(y)
+  stopifnot(nMax > 1)
+  for(b in list(starts, ends)){
+    stopifnot(is.integer(b))
+    stopifnot(all(b >= 1))
+  }
+  stopifnot(all(ends > starts))
+  ## sort the regions in case they are not specified in increasing
+  ## order.
+  ord <- order(starts)
+  starts <- starts[ord]
+  ends <- ends[ord]
+  n.regions <- length(ends)
+  segStart <- integer(n.regions+1)
+  sR <- integer(n.regions+1)
+  eR <- integer(n.regions+1)
+  cost <- 0
+  status <- -1
+  result <- .C('bridge_bases',
+               as.double(y), as.integer(base),
+               as.integer(starts), as.integer(ends), 
+               as.integer(sR), as.integer(eR), 
+               as.integer(nMax), as.integer(n.regions),
+               as.integer(segStart), as.integer(status),
+               as.double(cost))
+  names(result) <- c("x", "base",
+                     "starts", "ends",
+                     "sR", "eR",
+                     "nMax", "n.regions",
+                     "segStart", "status",
+                     "cost")
+  if(result$status != 0){
+    stop("error code ", result$status)
+  }
+  result$cost <- result$cost + sum(y^2)
+  result$change <- c(result$segStart, nMax)
+  result$smt <- smoothedSignal(y, result$change, method=mean)
+  break.i <- result$change[-c(1,length(result$change))]
+  break.base <- 
+    floor( (base[break.i] + base[break.i+1])/2 )
+  break.draw <- break.base+1/2
+  first.base <- c(base[1]-1/2,break.draw)
+  last.base <- c(break.draw,base[length(base)]+1/2)
+  result$seg.df <-
+    data.frame(first.base,last.base,
+               first.i=c(1,break.i+1),last.i=c(break.i,length(y)),
+               mean=result$smt[result$change[-1]])
+  result$break.df <- data.frame(base=break.base)
+  result$signal.df <- data.frame(base,signal=y,smooth=result$smt)
+  result$ann.df <-
+    data.frame(first.base=starts,last.base=ends,
+               first.i=result$sR[-length(result$sR)],
+               last.i=result$eR[-length(result$eR)],
+               annotation="1breakpoint")
+  result
+},ex=function(){
+  library(SegAnnot)
+  data(profiles,package="SegAnnot")
+  for(info in profiles){
+    ann <- subset(info$ann, annotation=="1breakpoint")
+    pro <- info$pro
+    fit <- SegAnnotBases(pro$log, pro$pos, ann$min, ann$max)
+    fitc <- SegAnnotBasesC(pro$log, pro$pos, ann$min, ann$max)
+    for(must.be.equal in c("sR","eR","change")){
+      stopifnot(all(fit[[must.be.equal]] == fitc[[must.be.equal]]))
+    }
+  }
 })
 
 
