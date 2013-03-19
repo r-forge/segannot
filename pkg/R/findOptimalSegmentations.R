@@ -215,7 +215,7 @@ SegAnnotBasesC <- structure(function
     pro <- info$pro
     fit <- SegAnnotBases(pro$log, pro$pos, ann$min, ann$max)
     fitc <- SegAnnotBasesC(pro$log, pro$pos, ann$min, ann$max)
-    for(must.be.equal in c("sR","eR","change")){
+    for(must.be.equal in c("sR","eR","change","cost")){
       stopifnot(all(fit[[must.be.equal]] == fitc[[must.be.equal]]))
     }
   }
