@@ -3,14 +3,13 @@
 #include <math.h>
 
 int SegAnnotBases(
-    const double * x, const unsigned * base,
-    const unsigned *first_base, const unsigned *last_base, 
-    unsigned *sR, unsigned *eR, 
-    const unsigned nMax, const unsigned n_regions, 
+    const double * x, const int * base,
+    const int *first_base, const int *last_base, 
+    const int nMax, const int n_regions, 
     // need to calculate the path of optimal breaks:
-    unsigned * segStart, double * cost) {
+    int * segStart) {
 
-    unsigned p, n, i;
+    int p, n, i;
     for(p=0; p<n_regions; p++){
 	// Check that regions are increasing.
 	if(p>0 && first_base[p] <= first_base[p-1]){
@@ -20,17 +19,17 @@ int SegAnnotBases(
 	    return ERROR_LAST_BEFORE_FIRST;
 	}
     }
-    unsigned pMax = n_regions+1;
-    //unsigned *sR, *eR;
-    //sR = (unsigned *)malloc(pMax * sizeof(unsigned));
-    //eR = (unsigned *)malloc(pMax * sizeof(unsigned));
+    int pMax = n_regions+1;
+    int *sR, *eR;
+    sR = (int *)malloc(pMax * sizeof(int));
+    eR = (int *)malloc(pMax * sizeof(int));
 
     //printf("Cumulative sum \n");
     // Cumulative sum of x //
     double * sx = (double *)malloc(nMax * sizeof(double));
     sx[0] = x[0];
-    unsigned first_p = 0;
-    unsigned last_p = 0;
+    int first_p = 0;
+    int last_p = 0;
     for (n = 1; n < nMax; ++n)
     {
 	//base must be in increasing order!!!
@@ -74,10 +73,10 @@ int SegAnnotBases(
     // Initialize Last change object for the different regions //
 
     //printf("Indexes allocation\n");
-    unsigned ** M = (unsigned **) malloc(pMax * sizeof(unsigned*));
+    int ** M = (int **) malloc(pMax * sizeof(int*));
     for ( p = 0; p < pMax; ++p)
     {
-	M[p] = (unsigned *) malloc( (eR[p] - sR[p]+1) * sizeof(unsigned));
+	M[p] = (int *) malloc( (eR[p] - sR[p]+1) * sizeof(int));
 	for(i=0; i < (eR[p] - sR[p]+1); ++i)
 	{
 	    M[p][i] = 0;
@@ -88,10 +87,10 @@ int SegAnnotBases(
     // Initialization //
     // the first break is in the first region //
     //printf("Initialisation C[0][t]\n");
-    unsigned tOut=sR[0];
-    unsigned idOut=0;
+    int tOut=sR[0];
+    int idOut=0;
     double scx;
-    unsigned lx;
+    int lx;
     while (tOut <= eR[0]) 
     {
 	scx = sx[tOut];
@@ -105,8 +104,8 @@ int SegAnnotBases(
 	
     // Update //
     //printf("Update C[p>=1][t]\n");
-    unsigned idIn;
-    unsigned tIn;
+    int idIn;
+    int tIn;
     double proposedCost;
     for ( p = 1; p < pMax; ++p)
     {
@@ -149,15 +148,15 @@ int SegAnnotBases(
     // Finish //
     //printf("Finish %d, %d \n", pMax-1, M[pMax-1][0]);
     segStart[pMax-1] = M[pMax-1][0];
-    cost[0] = C[pMax-1][0];
+    //cost[0] = C[pMax-1][0];
     //printf("Retour %d, %f\n", M[pMax-1][0], C[pMax-1][0]);
-    for ( p = pMax-2; p > 0; --p) 
+    for ( p = pMax-2; p >= 0; --p) 
     {
 	//printf("Retour %d, %d, %d\n", p, segStart[p+1], M[p][segStart[p+1]]);
 	segStart[p] = M[p][segStart[p+1]];
     }
-    for(p=1;p<pMax;p++){
-	segStart[p] += sR[p-1] + 1;
+    for(p=0;p<pMax;p++){
+	segStart[p] += sR[p] + 1;
     }
 	
 
@@ -177,8 +176,8 @@ int SegAnnotBases(
     }
     free(M);
 
-    //free(sR);
-    //free(eR);
+    free(sR);
+    free(eR);
 
     return 0;
 }

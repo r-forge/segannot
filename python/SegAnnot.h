@@ -1,9 +1,8 @@
-int SegAnnot(
-    const double * x, const unsigned * base,
-    const unsigned *first_base, const unsigned *last_base, 
-    unsigned *eR, unsigned *sR, 
-    const unsigned nMax, const unsigned n_regions, 
-    unsigned * iDPath, double *cost);
+int SegAnnotBases(
+    const double * , const int *,
+    const int *, const int *, 
+    const int, const int, 
+    int * );
 
 #define ERROR_BASES_NOT_INCREASING 1
 #define ERROR_REGIONS_NOT_INCREASING 2
