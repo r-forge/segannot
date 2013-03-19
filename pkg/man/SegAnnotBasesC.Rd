@@ -20,13 +20,15 @@
 \examples{
 library(SegAnnot)
 data(profiles,package="SegAnnot")
-for(info in profiles){
-  ann <- subset(info$ann, annotation=="1breakpoint")
-  pro <- info$pro
-  fit <- SegAnnotBases(pro$log, pro$pos, ann$min, ann$max)
-  fitc <- SegAnnotBasesC(pro$log, pro$pos, ann$min, ann$max)
-  for(must.be.equal in c("sR","eR","change","cost")){
-    stopifnot(all(fit[[must.be.equal]] == fitc[[must.be.equal]]))
+if(interactive()){
+  for(info in profiles){
+    ann <- subset(info$ann, annotation=="1breakpoint")
+    pro <- info$pro
+    fit <- SegAnnotBases(pro$log, pro$pos, ann$min, ann$max)
+    fitc <- SegAnnotBasesC(pro$log, pro$pos, ann$min, ann$max)
+    for(must.be.equal in c("sR","eR","change","cost")){
+      stopifnot(all(fit[[must.be.equal]] == fitc[[must.be.equal]]))
+    }
   }
 }
 }
