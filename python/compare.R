@@ -1,5 +1,10 @@
 works_with_R("2.15.2", ggplot2="0.9.3")
 
+dp.R <- scan("pruned-dp-R.csv")
+dp.python <- scan("pruned-dp-python.csv")
+dp.R[dp.R!=0] <- dp.R[dp.R!=0]-1
+stopifnot(all(dp.python == dp.R))
+
 seg.R <- read.csv("segmentation-R.csv")
 
 seg.py <- list()

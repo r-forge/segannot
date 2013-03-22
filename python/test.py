@@ -46,7 +46,7 @@ for name, a in result.iteritems():
     out = name + ".txt"
     a.tofile(out," ")
  
-short = arrays["probes_logratio"][:10]
-result = PrunedDP(short, 4)
-print result
+short = arrays["probes_logratio"]
+result = PrunedDP(short, 5)
+result.tofile("pruned-dp-python.csv",sep=" ")
 
