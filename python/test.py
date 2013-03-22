@@ -1,4 +1,5 @@
 from SegAnnot import SegAnnotBases
+from PrunedDP import PrunedDP
 import csv
 import numpy
 

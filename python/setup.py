@@ -6,6 +6,7 @@ setup (
     description = 'L2-optimal annotation-aware segmentation',
     ##packages=["SegAnnot"],
     ext_modules = [
-        Extension('SegAnnot',['interface.c','SegAnnot.c']),
+        Extension('SegAnnot',['SegAnnot_interface.c','SegAnnot.c']),
+        Extension("PrunedDP",["PrunedDP_interface.cpp",'PrunedDP.cpp']),
         ],
     )
