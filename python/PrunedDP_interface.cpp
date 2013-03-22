@@ -15,10 +15,10 @@ PrunedDP2Py(PyObject *self, PyObject *args){
 	PyErr_SetString(PyExc_TypeError,
 			"signal must be numpy.ndarray type double");
 	return NULL;
-    }
+    } 
     npy_intp n_signal = PyArray_DIM(signal, 0);
-    npy_intp n_path = n_signal * Kmax;
-    PyObject *path = PyArray_SimpleNew(1,&n_path,PyArray_INT);
+    npy_intp n_path[] = {Kmax, n_signal};
+    PyObject *path = PyArray_SimpleNew(2,n_path,PyArray_INT);
     int *pathA = (int*)PyArray_DATA(path);
     double *signalA = (double*)PyArray_DATA(signal);
     int status = PrunedDP(signalA, n_signal, Kmax, pathA);
