@@ -64,14 +64,14 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
     npy_intp n_signal = PyArray_DIM(signal,0);
     npy_intp n_base = PyArray_DIM(base,0);
     if(n_signal != n_base){
-	PyErr_SetString(PyExc_TypeError,
+	PyErr_SetString(PyExc_ValueError,
 			"signal and base must be same length");
 	return NULL;
     }
     npy_intp n_starts = PyArray_DIM(starts,0);
     npy_intp n_ends = PyArray_DIM(ends,0);
     if(n_starts != n_ends){
-	PyErr_SetString(PyExc_TypeError,
+	PyErr_SetString(PyExc_ValueError,
 			"starts and ends must be same length");
 	return NULL;
     }
@@ -85,35 +85,42 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
     int *segStartA = (int*)PyArray_DATA(segStart);
     PyObject *segEnd = PyArray_SimpleNew(1,&n_segments,PyArray_INT);
     int *segEndA = (int*)PyArray_DATA(segEnd);
-    PyObject *bkpts = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
-    int *bkptsA = (int*)PyArray_DATA(bkpts);
+    PyObject *break_min = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
+    int *break_minA = (int*)PyArray_DATA(break_min);
+    PyObject *break_mid = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
+    int *break_midA = (int*)PyArray_DATA(break_mid);
+    PyObject *break_max = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
+    int *break_maxA = (int*)PyArray_DATA(break_max);
     PyObject *segMean = PyArray_SimpleNew(1,&n_segments,PyArray_DOUBLE);
     double *segMeanA = (double*)PyArray_DATA(segMean);
     int status = SegAnnotBases( 
 	signalA, baseA, startsA, endsA, 
 	n_signal, n_starts, 
-	segStartA, segEndA, bkptsA, segMeanA);
+	segStartA, segEndA, segMeanA,
+	break_minA, break_midA, break_maxA);
     if(status == ERROR_BASES_NOT_INCREASING){
-	PyErr_SetString(PyExc_TypeError,
+	PyErr_SetString(PyExc_ValueError,
 			"bases not increasing");
     }
     if(status == ERROR_REGIONS_NOT_INCREASING){
-	PyErr_SetString(PyExc_TypeError,
+	PyErr_SetString(PyExc_ValueError,
 			"regions not increasing");
     }
     if(status == ERROR_LAST_BEFORE_FIRST){
-	PyErr_SetString(PyExc_TypeError,
+	PyErr_SetString(PyExc_ValueError,
 			"last base of region before first");
     }
     if(status != 0){
 	return NULL;
     }
 
-    return Py_BuildValue("{s:N,s:N,s:N,s:N}",
+    return Py_BuildValue("{s:N,s:N,s:N,s:N,s:N,s:N}",
 			 "start",segStart,
 			 "end",segEnd,
-			 "bkpts",bkpts,
-			 "mean",segMean);
+			 "mean",segMean,
+			 "break_min",break_min,
+			 "break_mid",break_mid,
+			 "break_max",break_max);
 }
 
 static PyMethodDef Methods[] = {

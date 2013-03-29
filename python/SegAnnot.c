@@ -8,7 +8,8 @@ int SegAnnotBases(
     const int *first_base, const int *last_base, 
     const int nMax, const int n_regions, 
     // need to calculate the path of optimal breaks:
-    int * segStart, int * segEnd, int *bkpts, double * segMean) {
+    int * segStart, int * segEnd, double * segMean,
+    int *break_min, int *break_mid, int *break_max) {
 
     int p, n, i;
     for(p=0; p<n_regions; p++){
@@ -174,7 +175,9 @@ int SegAnnotBases(
 	i = break_before[p];
 	first_probe[p+1] = i;
 	last_probe[p] = i-1;
-	bkpts[p] = (base[i]+base[i-1])/2;
+	break_min[p] = base[i-1];
+	break_max[p] = base[i];
+	break_mid[p] = (break_min[p]+break_max[p])/2;
 	//printf("%d\n",bkpts[p]);
     }
     // Calculate segment means.
@@ -183,12 +186,12 @@ int SegAnnotBases(
 	if(p==0){
 	    segStart[p] = base[0];
 	}else{
-	    segStart[p] = bkpts[p-1];
+	    segStart[p] = break_mid[p-1];
 	}
 	if(p==pMax-1){
 	    segEnd[p] = base[nMax-1];
 	}else{
-	    segEnd[p] = bkpts[p];
+	    segEnd[p] = break_mid[p];
 	}
 	total = 0;
 	for(i=first_probe[p]; i<=last_probe[p]; i++){
@@ -198,7 +201,7 @@ int SegAnnotBases(
 	//printf("%6d %6d %10d %10d %10f\n", first_probe[p]+1, last_probe[p]+1,
 	//     segStart[p], segEnd[p], segMean[p]);
     }
-    // Free allocated object //
+    // Free allocated objects //
     //printf("Free \n");
     free(first_probe);
     free(last_probe);

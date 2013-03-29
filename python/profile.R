@@ -12,6 +12,7 @@ for(N in names(pro)){
 ann <- subset(pro$ann, annotation=="1breakpoint")
 result <- SegAnnotBases(pro$pro$log, pro$pro$pos, ann$min, ann$max)
 write.csv(result$seg.df, "segmentation-R.csv", row.names=FALSE, quote=FALSE)
+write.csv(result$break.df, "breaks-R.csv", row.names=FALSE, quote=FALSE)
 
 ## quick check that the path is correct.
 cghseg:::colibriR_c(pro$pro[1:10,"logratio"],4)$path

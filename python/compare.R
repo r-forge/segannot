@@ -6,14 +6,19 @@ dp.R[dp.R!=0] <- dp.R[dp.R!=0]-1
 stopifnot(all(dp.python == dp.R))
 
 seg.R <- read.csv("segmentation-R.csv")
+breaks.R <- read.csv("breaks-R.csv")
 
 seg.py <- list()
-for(pre in c("mean","start","end")){
+for(pre in c("mean","start","end","break_mid")){
   f <- sprintf("%s.txt", pre)
   seg.py[[pre]] <- scan(f)
 }
-seg.py <- do.call(data.frame,seg.py)
+seg.py <- do.call(data.frame,seg.py[c("mean","start","end")])
 
+## check equivalent breakpoint positions.
+stopifnot(all(seg.py$break_mid == breaks.R$base))
+
+## check equivalent segmentations.
 stopifnot(abs(seg.py$mean - seg.R$mean) < 1e-6)
 stopifnot(all(abs(seg.py$start - seg.R$first.base)<=0.5))
 stopifnot(all(abs(seg.py$end - seg.R$last.base)<=0.5))
