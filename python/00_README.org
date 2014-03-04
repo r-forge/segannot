@@ -1,0 +1,68 @@
+# -*- org-export-with-sub-superscripts: {} -*-
+
+This directory contains the PrunedDP and SegAnnot Python extension
+modules. These programs are for calculating maximum likelihood
+segmentations, and are described in the paper "[[http://bioinformatics.oxfordjournals.org/content/early/2014/02/03/bioinformatics.btu072.short][SegAnnDB: interactive
+Web-based genomic segmentation]]" by Hocking et al, Bioinformatics 2014.
+
+* Installing PrunedDP and SegAnnot
+
+Type =make= to compile the python code, and run a check to make sure it
+gives the same results as the R code from which it was ported.
+
+Type =python setup.py install= to install the PrunedDP and SegAnnot
+extension modules.
+
+* Using PrunedDP 
+
+#+BEGIN_SRC python
+from PrunedDP import PrunedDP
+segmat = PrunedDP(y, kmax)
+#+END_SRC
+
+where
+
+=y= is a numpy float array representing the noisy measurements to
+segment.
+
+=kmax= is an int giving the maximum number of segments to consider,
+should be <= len(y).
+
+=segmat= is a numpy int matrix giving the start end end indices of the
+maximum likelihood segments, which are the solutions to the following
+optimization problems, for k in 1,...,kmax:
+
+yhat^{k} = argmin_{mu} ||y-mu||_2^2 such that mu has k segments.
+
+* Using SegAnnot
+
+#+BEGIN_SRC python
+from SegAnnot import SegAnnotBases
+result = SegAnnotBases(y, position, m, M)
+#+END_SRC
+
+=position= is a numpy int32 array representing the positions at which
+the noisy measurements y were measured.
+
+=m= is a numpy int32 array representing the start position of each
+annotated region having 1 breakpoint.
+
+=M= is a numpy int32 array representing the start position of each
+annotated region having 1 breakpoint.
+
+=result= is a dictionary containing the following numpy arrays:
+
+| name      | type  | len      | meaning                            |
+|-----------+-------+----------+------------------------------------|
+| min       | int32 | len(m)+1 | segment start indices              |
+| max       | int32 | len(m)+1 | segment end indices                |
+| mu        | float | len(m)+1 | segment means                      |
+| break_min | int32 | len(m)   | probe positions before breakpoints |
+| break_max | int32 | len(m)   | probe positions after breakpoints  |
+| break_mid | int32 | len(m)   | estimated breakpoint positions     |
+
+which represents the solution to the following optimization problem:
+
+yhat = argmin_{mu} ||y-mu||_2^2 such that mu has 1 breakpoint/change
+in each of the len(m) regions specified by m and M, and mu has no
+other changes.

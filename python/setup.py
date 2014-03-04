@@ -1,5 +1,9 @@
 from distutils.core import setup, Extension
 
+requires = [
+    'numpy',
+    ]
+
 setup (
     name = 'SegAnnot',
     version = '1.0',
