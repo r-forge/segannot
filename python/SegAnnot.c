@@ -3,15 +3,18 @@
 #include <stdio.h>
 #include <math.h>
 
-int SegAnnotBases(
-    const double * x, const int * base,
-    const int *first_base, const int *last_base, 
+int SegAnnotBases
+(
+    const double * x, const int * base, //of data
+    const int *first_base, const int *last_base, // of regions/labels
     const int nMax, const int n_regions, 
     // need to calculate the path of optimal breaks:
     int * segStart, int * segEnd, double * segMean,
-    int *break_min, int *break_mid, int *break_max) {
-
+    int *break_min, double *break_mid, int *break_max) {
     int p, n, i;
+    for(i=0; i<nMax; i++){
+      printf("%f at %d\n", x[i], base[i]);
+    }
     for(p=0; p<n_regions; p++){
 	// Check that regions are increasing.
 	if(p>0 && first_base[p] <= first_base[p-1]){
@@ -36,6 +39,7 @@ int SegAnnotBases(
     {
 	//base must be in increasing order!!!
 	if(base[n] < base[n-1]){
+	  printf("%d %d\n", base[n], base[n-1]);
 	    return ERROR_BASES_NOT_INCREASING;
 	}
 	// Map first_base and last_base to sR and eR.
@@ -177,7 +181,7 @@ int SegAnnotBases(
 	last_probe[p] = i-1;
 	break_min[p] = base[i-1];
 	break_max[p] = base[i];
-	break_mid[p] = (break_min[p]+break_max[p])/2;
+	break_mid[p] = (break_min[p]+break_max[p])/2.0;
 	//printf("%d\n",bkpts[p]);
     }
     // Calculate segment means.
@@ -186,12 +190,12 @@ int SegAnnotBases(
 	if(p==0){
 	    segStart[p] = base[0];
 	}else{
-	    segStart[p] = break_mid[p-1];
+	    segStart[p] = break_max[p-1];
 	}
 	if(p==pMax-1){
 	    segEnd[p] = base[nMax-1];
 	}else{
-	    segEnd[p] = break_mid[p];
+	    segEnd[p] = break_min[p];
 	}
 	total = 0;
 	for(i=first_probe[p]; i<=last_probe[p]; i++){

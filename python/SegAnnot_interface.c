@@ -12,24 +12,36 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
 	   )){
 	return NULL;
     }
-    if(!PyArray_ISFLOAT(signal)){
-	PyErr_SetString(PyExc_TypeError,
-			"signal must be numpy.ndarray type double");
+    PyArray_Descr *signal_dtype = PyArray_DTYPE(signal);
+    if(!PyArray_CanCastSafely(signal_dtype->type_num, NPY_DOUBLE)){
+	PyErr_Format
+	  (PyExc_TypeError,
+	   "signal[%c%d] must be safely castable to double",
+	   signal_dtype->type, signal_dtype->elsize);
 	return NULL;
     }
-    if(!PyArray_ISINTEGER(base)){
-	PyErr_SetString(PyExc_TypeError,
-			"base must be numpy.ndarray type int");
+    PyArray_Descr *base_dtype = PyArray_DTYPE(base);
+    if(!PyArray_CanCastSafely(base_dtype->type_num, NPY_INT)){
+	PyErr_Format
+	  (PyExc_TypeError,
+	   "base[%c%d] must be safely castable to int",
+	   base_dtype->type, base_dtype->elsize);
 	return NULL;
     }
-    if(!PyArray_ISINTEGER(starts)){
-	PyErr_SetString(PyExc_TypeError,
-			"starts must be numpy.ndarray type int");
+    PyArray_Descr *starts_dtype = PyArray_DTYPE(starts);
+    if(!PyArray_CanCastSafely(starts_dtype->type_num, NPY_INT)){
+	PyErr_Format
+	  (PyExc_TypeError,
+	   "starts[%c%d] must be safely castable to int",
+	   starts_dtype->type, starts_dtype->elsize);
 	return NULL;
     }
-    if(!PyArray_ISINTEGER(ends)){
-	PyErr_SetString(PyExc_TypeError,
-			"ends must be numpy.ndarray type int");
+    PyArray_Descr *ends_dtype = PyArray_DTYPE(ends);
+    if(!PyArray_CanCastSafely(ends_dtype->type_num, NPY_INT)){
+	PyErr_Format
+	  (PyExc_TypeError,
+	   "ends[%c%d] must be safely castable to int",
+	   ends_dtype->type, ends_dtype->elsize);
 	return NULL;
     }
     npy_intp n_signal = PyArray_DIM(signal,0);
@@ -58,8 +70,8 @@ SegAnnotBases2Py(PyObject *self, PyObject *args){
     int *segEndA = (int*)PyArray_DATA(segEnd);
     PyObject *break_min = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
     int *break_minA = (int*)PyArray_DATA(break_min);
-    PyObject *break_mid = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
-    int *break_midA = (int*)PyArray_DATA(break_mid);
+    PyObject *break_mid = PyArray_SimpleNew(1,&n_starts,PyArray_DOUBLE);
+    double *break_midA = (double*)PyArray_DATA(break_mid);
     PyObject *break_max = PyArray_SimpleNew(1,&n_starts,PyArray_INT);
     int *break_maxA = (int*)PyArray_DATA(break_max);
     PyObject *segMean = PyArray_SimpleNew(1,&n_segments,PyArray_DOUBLE);
