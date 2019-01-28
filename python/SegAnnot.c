@@ -12,9 +12,9 @@ int SegAnnotBases
     int * segStart, int * segEnd, double * segMean,
     int *break_min, double *break_mid, int *break_max) {
     int p, n, i;
-    for(i=0; i<nMax; i++){
+    /*for(i=0; i<nMax; i++){
       printf("%f at %d\n", x[i], base[i]);
-    }
+      }*/
     for(p=0; p<n_regions; p++){
 	// Check that regions are increasing.
 	if(p>0 && first_base[p] <= first_base[p-1]){
@@ -39,7 +39,7 @@ int SegAnnotBases
     {
 	//base must be in increasing order!!!
 	if(base[n] < base[n-1]){
-	  printf("%d %d\n", base[n], base[n-1]);
+	  //printf("%d %d\n", base[n], base[n-1]);
 	    return ERROR_BASES_NOT_INCREASING;
 	}
 	// Map first_base and last_base to sR and eR.
